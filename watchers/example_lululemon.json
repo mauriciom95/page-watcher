@@ -1,0 +1,15 @@
+{
+  "id": "example_lululemon",
+  "name": "EXAMPLE (disabled) - Lululemon product back in stock",
+  "enabled": false,
+  "url": "https://shop.lululemon.com/p/REPLACE-WITH-REAL-PRODUCT-URL",
+  "require_absent": [
+    "Sold Out",
+    "Notify Me"
+  ],
+  "require_present": [
+    "Add to Bag"
+  ],
+  "notify_subject": "Lululemon item back in stock",
+  "notify_body": "The product page no longer shows Sold Out and has an Add to Bag button. Check it: {url}"
+}
