@@ -2,13 +2,21 @@
   "id": "odyssey_imax_aug20",
   "name": "The Odyssey (2026) IMAX tickets on sale for showtimes after Aug 20",
   "enabled": true,
+  "render": "playwright",
   "url": "https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21",
-  "require_absent": [
-    "We'll notify you when tickets go on sale"
+  "initial_wait_ms": 5000,
+  "actions": [
+    {"click": ".js-location-overlay"},
+    {"wait_ms": 1500},
+    {"fill": {"selector": "#setLocationSearchInput", "value": "10019"}},
+    {"wait_ms": 1000},
+    {"press": "Enter"},
+    {"wait_ms": 4000}
   ],
-  "require_present": [
-    "IMAX"
-  ],
+  "success_selector": {
+    "selector": ".format-filter__list-item",
+    "has_text": "IMAX"
+  },
   "notify_subject": "The Odyssey IMAX tickets may be on sale (post Aug 20)",
-  "notify_body": "Fandango's page for The Odyssey no longer shows the 'notify me' placeholder for 2026-08-21 and the page mentions IMAX. Double check and grab tickets: {url}"
+  "notify_body": "Fandango now shows an IMAX format filter for 2026-08-21 near zip 10019, meaning real IMAX showtimes exist for that date. Double check and grab tickets: {url}"
 }
