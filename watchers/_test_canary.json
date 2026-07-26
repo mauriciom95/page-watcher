@@ -1,0 +1,12 @@
+{
+  "id": "_test_canary",
+  "name": "TEST canary - verifies the trigger+notify pipeline end to end",
+  "enabled": true,
+  "url": "https://example.com",
+  "require_present": [
+    "Example Domain"
+  ],
+  "require_absent": [],
+  "notify_subject": "page-watcher pipeline test (safe to ignore)",
+  "notify_body": "If you got this, the fetch -> trigger detection -> ntfy push -> state commit pipeline works end to end. This watcher will be removed after the test. {url}"
+}
