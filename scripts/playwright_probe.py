@@ -71,30 +71,30 @@ def main():
         print("Location button before:", page.locator(".js-location-overlay").first.inner_text())
         page.locator(".js-location-overlay").first.click()
         page.wait_for_timeout(2000)
-        page.screenshot(path="/tmp/after_click_overlay.png", full_page=True)
 
-        print("--- inputs visible after clicking location button ---")
-        for el in page.locator("input:visible").all():
-            try:
-                print({
-                    "name": el.get_attribute("name"),
-                    "id": el.get_attribute("id"),
-                    "placeholder": el.get_attribute("placeholder"),
-                    "aria-label": el.get_attribute("aria-label"),
-                })
-            except Exception as e:
-                print("input error:", e)
+        search_input = page.locator("#setLocationSearchInput").first
+        search_input.fill(TARGET_ZIP)
+        page.wait_for_timeout(2500)
+        page.screenshot(path="/tmp/after_typing_zip.png", full_page=True)
 
-        print("--- buttons visible after clicking location button ---")
-        for el in page.locator("button:visible").all():
+        print("--- suggestion/dropdown items visible after typing ---")
+        for el in page.locator("li:visible, [role=option]:visible, [class*=suggest i]:visible, [class*=dropdown i]:visible").all():
             try:
-                print({
-                    "class": el.get_attribute("class"),
-                    "aria-label": el.get_attribute("aria-label"),
-                    "text": el.inner_text()[:40],
-                })
+                t = el.inner_text().strip()
+                if t:
+                    print({"class": el.get_attribute("class"), "text": t[:80]})
             except Exception as e:
-                print("button error:", e)
+                pass
+
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(4000)
+        page.screenshot(path="/tmp/after_enter.png", full_page=True)
+
+        print("Location button after:", page.locator(".js-location-overlay").first.inner_text())
+        print("--- body text near THEATERS NEAR ---")
+        text = page.inner_text("body")
+        idx = text.find("THEATERS NEAR")
+        print(text[idx:idx+600] if idx >= 0 else "NOT FOUND")
 
         browser.close()
 
