@@ -53,6 +53,9 @@ def dump_interactive_elements(page):
             print("zip element error:", e)
 
 
+TARGET_ZIP = "10019"
+
+
 def main():
     with sync_playwright() as p:
         browser = p.chromium.launch()
@@ -63,9 +66,36 @@ def main():
         )
         page = context.new_page()
         page.goto(URL, wait_until="load", timeout=60000)
-        page.wait_for_timeout(8000)
-        dump_interactive_elements(page)
-        page.screenshot(path="/tmp/toy_story_5.png", full_page=True)
+        page.wait_for_timeout(5000)
+
+        print("Location button before:", page.locator(".js-location-overlay").first.inner_text())
+        page.locator(".js-location-overlay").first.click()
+        page.wait_for_timeout(2000)
+        page.screenshot(path="/tmp/after_click_overlay.png", full_page=True)
+
+        print("--- inputs visible after clicking location button ---")
+        for el in page.locator("input:visible").all():
+            try:
+                print({
+                    "name": el.get_attribute("name"),
+                    "id": el.get_attribute("id"),
+                    "placeholder": el.get_attribute("placeholder"),
+                    "aria-label": el.get_attribute("aria-label"),
+                })
+            except Exception as e:
+                print("input error:", e)
+
+        print("--- buttons visible after clicking location button ---")
+        for el in page.locator("button:visible").all():
+            try:
+                print({
+                    "class": el.get_attribute("class"),
+                    "aria-label": el.get_attribute("aria-label"),
+                    "text": el.inner_text()[:40],
+                })
+            except Exception as e:
+                print("button error:", e)
+
         browser.close()
 
 
