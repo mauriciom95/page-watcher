@@ -15,9 +15,10 @@ happens. Runs on a schedule via GitHub Actions — no server to maintain.
 - A watcher is reported as `TRIGGERED` only on the transition from
   not-matched to matched (so you're notified once, not on every run), and
   `check.py` posts to the `NTFY_TOPIC` ntfy topic when that happens.
-- `.github/workflows/check.yml` runs `check.py` once an hour, then commits
-  the updated `state/state.json` back to the repo so state persists across
-  runs (each run is a fresh checkout).
+- `.github/workflows/check.yml` runs `check.py` every 10 minutes, then
+  commits the updated `state/state.json` back to the repo so state persists
+  across runs (each run is a fresh checkout). The repo is public so this
+  runs on GitHub's free, unlimited Actions minutes for public repos.
 
 ## Notifications (ntfy.sh)
 
@@ -30,10 +31,12 @@ happens. Runs on a schedule via GitHub Actions — no server to maintain.
    gh secret set NTFY_TOPIC --repo <owner>/page-watcher
    ```
 3. Treat the topic name like a password — anyone who knows it can publish to
-   (and read) that ntfy.sh topic, since the public server has no auth. Pick a
-   long random string (e.g. `python3 -c "import secrets; print(secrets.token_hex(8))"`)
-   and keep the repo private, or self-host ntfy / use a paid ntfy.sh account
-   for access control if you want stronger guarantees.
+   (and read) that ntfy.sh topic, since the public server has no auth. It's
+   stored only as an encrypted Actions secret (never in code, and masked in
+   logs), which is why it's safe to keep even though this repo is public.
+   Pick a long random string (e.g.
+   `python3 -c "import secrets; print(secrets.token_hex(8))"`) — self-host
+   ntfy or use a paid ntfy.sh account for stronger access control if wanted.
 
 ## Running it manually
 
