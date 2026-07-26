@@ -8,7 +8,7 @@
   "actions": [
     {"click": ".js-location-overlay"},
     {"wait_ms": 1500},
-    {"fill": {"selector": "#setLocationSearchInput", "value": "10019"}},
+    {"fill": {"selector": "#setLocationSearchInput", "value": "90028"}},
     {"wait_ms": 1000},
     {"press": "Enter"},
     {"wait_ms": 4000}
@@ -18,5 +18,5 @@
     "has_text": "IMAX"
   },
   "notify_subject": "The Odyssey IMAX tickets may be on sale (post Aug 20)",
-  "notify_body": "Fandango now shows an IMAX format filter for 2026-08-21 near zip 10019, meaning real IMAX showtimes exist for that date. Double check and grab tickets: {url}"
+  "notify_body": "Fandango now shows an IMAX format filter for 2026-08-21 near zip 90028 (Hollywood/LA), meaning real IMAX showtimes exist for that date. Double check and grab tickets: {url}"
 }

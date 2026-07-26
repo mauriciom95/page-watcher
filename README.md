@@ -103,7 +103,7 @@ count as "the page" if you just grep the whole body).
 ## Current watchers
 
 - `odyssey_imax_aug20` — The Odyssey (2026) on Fandango. Uses `"playwright"`
-  mode: forces the delivery location to zip 10019 (NYC) via the site's
+  mode: forces the delivery location to zip 90028 (Hollywood/LA) via the site's
   location-picker UI (the `?zipcode=` query param is silently ignored —
   confirmed by testing), navigates to the 2026-08-21 showtimes view, and
   checks for an "IMAX" format-filter chip, which only renders when that
