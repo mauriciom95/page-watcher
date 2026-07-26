@@ -1,9 +1,8 @@
 # page-watcher
 
 Watches web pages for a condition (text that should appear or disappear) and
-reports state transitions so a caller can notify on them. Built to run as a
-scheduled cloud agent, but `check.py` works standalone anywhere Python 3 is
-installed.
+pushes a phone notification via [ntfy.sh](https://ntfy.sh) the moment it
+happens. Runs on a schedule via GitHub Actions — no server to maintain.
 
 ## How it works
 
@@ -14,12 +13,27 @@ installed.
 - `check.py` fetches every enabled watcher's URL, evaluates the condition,
   and compares it to the last known result stored in `state/state.json`.
 - A watcher is reported as `TRIGGERED` only on the transition from
-  not-matched to matched (so you're notified once, not on every run).
-- The script never sends notifications itself. It prints one JSON line per
-  watcher to stdout. The scheduled agent that runs it is responsible for
-  emailing on `TRIGGERED` watchers and committing the updated
-  `state/state.json` back to the repo (so state persists across runs in a
-  fresh sandbox).
+  not-matched to matched (so you're notified once, not on every run), and
+  `check.py` posts to the `NTFY_TOPIC` ntfy topic when that happens.
+- `.github/workflows/check.yml` runs `check.py` once an hour, then commits
+  the updated `state/state.json` back to the repo so state persists across
+  runs (each run is a fresh checkout).
+
+## Notifications (ntfy.sh)
+
+1. Install the ntfy app ([iOS](https://apps.apple.com/app/ntfy/id1625396347)/
+   [Android](https://play.google.com/store/apps/details?id=io.heckel.ntfy))
+   or use https://ntfy.sh/app, and subscribe to your topic.
+2. Store that topic name as a repo secret so the workflow can use it without
+   it appearing in code or logs:
+   ```
+   gh secret set NTFY_TOPIC --repo <owner>/page-watcher
+   ```
+3. Treat the topic name like a password — anyone who knows it can publish to
+   (and read) that ntfy.sh topic, since the public server has no auth. Pick a
+   long random string (e.g. `python3 -c "import secrets; print(secrets.token_hex(8))"`)
+   and keep the repo private, or self-host ntfy / use a paid ntfy.sh account
+   for access control if you want stronger guarantees.
 
 ## Running it manually
 
@@ -66,3 +80,8 @@ a watcher's target content turns out to be JS-only, `require_present` /
 `require_absent` checks against the raw HTML won't see it, and the watcher
 will need a different strategy (e.g. finding the underlying API, or adding a
 headless-browser fetch step).
+
+GitHub disables scheduled workflows on a repo after 60 days with no commits
+at all. Since the workflow only commits when state actually changes, a
+watcher that never flips could in theory go quiet after 60 days — if that
+happens, any commit (or opening the Actions tab and re-enabling) restarts it.

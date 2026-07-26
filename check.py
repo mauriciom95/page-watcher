@@ -1,14 +1,10 @@
 #!/usr/bin/env python3
 """
 Fetches each enabled watcher's URL, evaluates its condition, and diffs
-against the last known state. Prints one JSON line per watcher to stdout
-so a calling agent can decide what to notify about, and rewrites
-state/state.json with the latest results.
-
-This script never sends notifications itself — it only detects state
-transitions. The calling routine (a Claude Code agent with a Gmail MCP
-connection) is responsible for emailing on TRIGGERED watchers and
-committing the updated state file back to git.
+against the last known state. Prints one JSON line per watcher to stdout,
+rewrites state/state.json with the latest results, and — for any watcher
+that just transitioned to matched (TRIGGERED) — pushes a notification via
+ntfy.sh if NTFY_TOPIC is set in the environment.
 """
 import json
 import os
@@ -25,6 +21,28 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 )
+
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
+NTFY_SERVER = os.environ.get("NTFY_SERVER", "https://ntfy.sh")
+
+
+def send_ntfy(title, message, url):
+    if not NTFY_TOPIC:
+        return
+    req = urllib.request.Request(
+        f"{NTFY_SERVER}/{NTFY_TOPIC}",
+        data=message.encode("utf-8"),
+        headers={
+            "Title": title,
+            "Click": url,
+            "Priority": "high",
+        },
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15).read()
+    except (urllib.error.URLError, urllib.error.HTTPError) as e:
+        print(f"ntfy send failed: {e}", file=sys.stderr)
 
 
 def load_state():
@@ -105,6 +123,9 @@ def main():
             "last_notified": now if status == "TRIGGERED" else prev.get("last_notified"),
         }
 
+        notify_subject = cfg.get("notify_subject") or cfg.get("name", wid)
+        notify_body = (cfg.get("notify_body") or "").format(url=cfg["url"])
+
         results.append({
             "id": wid,
             "name": cfg.get("name", wid),
@@ -112,9 +133,12 @@ def main():
             "status": status,
             "matched": matched,
             "error": error,
-            "notify_subject": cfg.get("notify_subject"),
-            "notify_body": (cfg.get("notify_body") or "").format(url=cfg["url"]),
+            "notify_subject": notify_subject,
+            "notify_body": notify_body,
         })
+
+        if status == "TRIGGERED":
+            send_ntfy(notify_subject, notify_body, cfg["url"])
 
     save_state(state)
 
