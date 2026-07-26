@@ -11,9 +11,10 @@ headless-browser approach before wiring it into check.py.
 from playwright.sync_api import sync_playwright
 
 # A definitely-on-sale-right-now movie (control) and the actual target.
+# Try forcing a specific zip via query param to see if Fandango honors it.
 PAGES = {
-    "toy_story_5_control": "https://www.fandango.com/toy-story-5-2026-243393/movie-overview",
-    "odyssey_target": "https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21",
+    "toy_story_5_zip_param": "https://www.fandango.com/toy-story-5-2026-243393/movie-overview?zipcode=10019",
+    "odyssey_zip_param": "https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21&zipcode=10019",
 }
 
 NYC = {"latitude": 40.7128, "longitude": -74.0060}
