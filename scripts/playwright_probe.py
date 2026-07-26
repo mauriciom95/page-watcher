@@ -21,8 +21,8 @@ NYC = {"latitude": 40.7128, "longitude": -74.0060}
 
 def probe(page, label, url):
     print(f"\n===== {label}: {url} =====")
-    page.goto(url, wait_until="networkidle", timeout=45000)
-    page.wait_for_timeout(3000)
+    page.goto(url, wait_until="load", timeout=60000)
+    page.wait_for_timeout(8000)
     text = page.inner_text("body")
 
     print("notify-me placeholder present:", "notify you when tickets go on sale" in text)
@@ -30,8 +30,9 @@ def probe(page, label, url):
     for chain in ["AMC", "Regal", "Cinemark", "Marcus"]:
         print(f"{chain} mentions:", text.count(chain))
     print("BUY TICKETS occurrences:", text.count("BUY TICKETS"))
-    print("--- first 400 chars of body text ---")
-    print(text[:400].replace("\n", " | "))
+    print("--- full body text ---")
+    print(text)
+    page.screenshot(path=f"/tmp/{label}.png", full_page=True)
 
 
 def main():
