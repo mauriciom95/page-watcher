@@ -10,30 +10,47 @@ headless-browser approach before wiring it into check.py.
 """
 from playwright.sync_api import sync_playwright
 
-# A definitely-on-sale-right-now movie (control) and the actual target.
-# Try forcing a specific zip via query param to see if Fandango honors it.
-PAGES = {
-    "toy_story_5_zip_param": "https://www.fandango.com/toy-story-5-2026-243393/movie-overview?zipcode=10019",
-    "odyssey_zip_param": "https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21&zipcode=10019",
-}
-
+URL = "https://www.fandango.com/toy-story-5-2026-243393/movie-overview"
 NYC = {"latitude": 40.7128, "longitude": -74.0060}
 
 
-def probe(page, label, url):
-    print(f"\n===== {label}: {url} =====")
-    page.goto(url, wait_until="load", timeout=60000)
-    page.wait_for_timeout(8000)
-    text = page.inner_text("body")
+def dump_interactive_elements(page):
+    print("--- inputs ---")
+    for el in page.locator("input").all():
+        try:
+            print({
+                "name": el.get_attribute("name"),
+                "id": el.get_attribute("id"),
+                "placeholder": el.get_attribute("placeholder"),
+                "aria-label": el.get_attribute("aria-label"),
+                "value": el.get_attribute("value"),
+            })
+        except Exception as e:
+            print("input error:", e)
 
-    print("notify-me placeholder present:", "notify you when tickets go on sale" in text)
-    print("IMAX mentions:", text.count("IMAX"))
-    for chain in ["AMC", "Regal", "Cinemark", "Marcus"]:
-        print(f"{chain} mentions:", text.count(chain))
-    print("BUY TICKETS occurrences:", text.count("BUY TICKETS"))
-    print("--- full body text ---")
-    print(text)
-    page.screenshot(path=f"/tmp/{label}.png", full_page=True)
+    print("--- buttons/elements with 'zip' or 'location' in attrs ---")
+    for el in page.locator("[class*=zip i], [class*=location i], [id*=zip i], [id*=location i], [aria-label*=zip i], [aria-label*=location i]").all():
+        try:
+            print({
+                "tag": el.evaluate("e => e.tagName"),
+                "class": el.get_attribute("class"),
+                "id": el.get_attribute("id"),
+                "aria-label": el.get_attribute("aria-label"),
+                "text": el.inner_text()[:80],
+            })
+        except Exception as e:
+            print("element error:", e)
+
+    print("--- element containing the zip text 98848 ---")
+    for el in page.get_by_text("98848").all():
+        try:
+            print({
+                "tag": el.evaluate("e => e.tagName"),
+                "class": el.get_attribute("class"),
+                "outerHTML": el.evaluate("e => e.outerHTML")[:500],
+            })
+        except Exception as e:
+            print("zip element error:", e)
 
 
 def main():
@@ -45,11 +62,10 @@ def main():
             locale="en-US",
         )
         page = context.new_page()
-        for label, url in PAGES.items():
-            try:
-                probe(page, label, url)
-            except Exception as e:
-                print(f"ERROR probing {label}: {e}")
+        page.goto(URL, wait_until="load", timeout=60000)
+        page.wait_for_timeout(8000)
+        dump_interactive_elements(page)
+        page.screenshot(path="/tmp/toy_story_5.png", full_page=True)
         browser.close()
 
 
