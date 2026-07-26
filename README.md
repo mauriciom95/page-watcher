@@ -1,17 +1,15 @@
 # page-watcher
 
-Watches web pages for a condition (text that should appear or disappear) and
-pushes a phone notification via [ntfy.sh](https://ntfy.sh) the moment it
-happens. Runs on a schedule via GitHub Actions — no server to maintain.
+Watches web pages for a condition and pushes a phone notification via
+[ntfy.sh](https://ntfy.sh) the moment it happens. Runs on a schedule via
+GitHub Actions — no server to maintain.
 
 ## How it works
 
-- Each file in `watchers/*.json` describes one thing to watch: a URL, a list
-  of substrings that must be **present**, and a list that must be **absent**
-  for the watcher to be considered "matched" (i.e. the condition you care
-  about is true).
-- `check.py` fetches every enabled watcher's URL, evaluates the condition,
-  and compares it to the last known result stored in `state/state.json`.
+- Each file in `watchers/*.json` describes one thing to watch and how to
+  evaluate it (see "Two check modes" below).
+- `check.py` runs every enabled watcher, evaluates its condition, and
+  compares it to the last known result stored in `state/state.json`.
 - A watcher is reported as `TRIGGERED` only on the transition from
   not-matched to matched (so you're notified once, not on every run), and
   `check.py` posts to the `NTFY_TOPIC` ntfy topic when that happens.
@@ -19,6 +17,30 @@ happens. Runs on a schedule via GitHub Actions — no server to maintain.
   commits the updated `state/state.json` back to the repo so state persists
   across runs (each run is a fresh checkout). The repo is public so this
   runs on GitHub's free, unlimited Actions minutes for public repos.
+
+## Two check modes
+
+Set per-watcher via the `"render"` field:
+
+- **`"http"` (default)** — plain HTTP fetch, no browser. Checks
+  `require_present` / `require_absent` substrings against the raw HTML.
+  Fast, but blind to anything JavaScript renders client-side.
+- **`"playwright"`** — renders the page in a real headless browser
+  (installed in CI via `requirements.txt` + `playwright install`), runs an
+  optional scripted `"actions"` sequence (click/fill/press/wait — e.g. to
+  set a delivery location the site requires before it'll show real data),
+  then checks for a specific element via `"success_selector"` instead of
+  raw text.
+
+**Use `"playwright"` whenever the target content is JS-rendered or
+personalized by location** — verify this by comparing `curl`'s raw output
+against what a real browser shows before picking a mode. See the Odyssey
+watcher below for a worked example of why this matters: a plain-text check
+against that page would have silently never worked, and a naive "does the
+page contain the word IMAX" check would have been a false positive from
+day one (that word already appears in marketing article titles on the page
+regardless of ticket availability). Scoping the check to a specific
+element (`.format-filter__list-item` with text "IMAX") avoids both traps.
 
 ## Notifications (ntfy.sh)
 
@@ -41,6 +63,8 @@ happens. Runs on a schedule via GitHub Actions — no server to maintain.
 ## Running it manually
 
 ```
+pip install -r requirements.txt
+playwright install chromium   # only needed for "playwright" watchers
 python3 check.py
 ```
 
@@ -54,37 +78,52 @@ Output is one JSON object per line, e.g.:
 - `OK` — checked, condition not newly true (either still false, or already
   true last run and already notified)
 - `TRIGGERED` — condition just became true; notify the user
-- `ERROR` — fetch failed; `matched` falls back to the last known value
+- `ERROR` — fetch/render failed; `matched` falls back to the last known value
 - `SKIPPED_DISABLED` — watcher has `"enabled": false`
 
 ## Adding a new watcher
 
-Copy `watchers/example_lululemon.json`, fill in a real URL, and set
-`"enabled": true`. Pick `require_present` / `require_absent` strings that
-reliably distinguish the "before" and "after" states of the page — view
-source (not just the rendered page) to confirm the text is actually present
-in the raw HTML, since this script does a plain HTTP fetch and does not
-execute JavaScript.
+Start with `watchers/example_lululemon.json` (a simple `"http"`-mode
+template) or `watchers/odyssey_imax_aug20.json` (a `"playwright"`-mode
+example with scripted actions), fill in a real URL, and set
+`"enabled": true`.
+
+Before writing the condition: fetch the page both ways and compare.
+
+```
+curl -sL -A "Mozilla/5.0 ..." "<url>" | less   # what check.py's http mode sees
+```
+
+If the content you care about isn't in that raw output, use `"playwright"`
+mode instead — and scope `success_selector` to the specific element that
+changes, not a page-wide text search, to avoid false positives from
+unrelated text elsewhere on the page (headlines, ads, nav links, etc. all
+count as "the page" if you just grep the whole body).
 
 ## Current watchers
 
-- `odyssey_imax_aug20` — The Odyssey (2026) on Fandango. Watches for the
-  "notify me, tickets aren't on sale yet" placeholder to disappear from the
-  2026-08-21 showtimes view (i.e. tickets on sale for dates after Aug 20),
-  while confirming the page mentions IMAX.
+- `odyssey_imax_aug20` — The Odyssey (2026) on Fandango. Uses `"playwright"`
+  mode: forces the delivery location to zip 10019 (NYC) via the site's
+  location-picker UI (the `?zipcode=` query param is silently ignored —
+  confirmed by testing), navigates to the 2026-08-21 showtimes view, and
+  checks for an "IMAX" format-filter chip, which only renders when that
+  format actually has bookable inventory for the selected date/location.
 - `example_lululemon` — disabled template showing the pattern for a
-  restock/availability watch on a product page.
+  simple `"http"`-mode restock/availability watch on a product page.
 
 ## Caveats
 
-Fandango (and many retail sites) render some content client-side via
-JavaScript. This script only fetches raw HTML — it doesn't run a browser. If
-a watcher's target content turns out to be JS-only, `require_present` /
-`require_absent` checks against the raw HTML won't see it, and the watcher
-will need a different strategy (e.g. finding the underlying API, or adding a
-headless-browser fetch step).
+Many retail/ticketing sites render content client-side via JavaScript and
+personalize it by inferred location. `"http"` mode is blind to both. Verify
+your condition actually appears in `check.py`'s fetch (raw HTTP, no
+browser) before relying on `"http"` mode — see "Adding a new watcher" above.
 
 GitHub disables scheduled workflows on a repo after 60 days with no commits
 at all. Since the workflow only commits when state actually changes, a
 watcher that never flips could in theory go quiet after 60 days — if that
 happens, any commit (or opening the Actions tab and re-enabling) restarts it.
+
+Playwright browser binaries are cached between runs (`actions/cache`,
+keyed on `requirements.txt`) to keep the 10-minute schedule fast; bumping
+the pinned version in `requirements.txt` will trigger one slower run to
+repopulate the cache.
