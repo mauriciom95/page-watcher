@@ -32,6 +32,28 @@ Set per-watcher via the `"render"` field:
   then checks for a specific element via `"success_selector"` instead of
   raw text.
 
+## Two evaluation modes
+
+Set per-watcher via the `"mode"` field:
+
+- **`"match"` (default)** — the render backend returns true/false, and the
+  watcher is `TRIGGERED` on the transition from not-matched to matched.
+  This is what both check modes above describe.
+- **`"diff"`** — instead of a boolean, each run captures a text snapshot
+  of the page and compares it to the previous run's snapshot. `TRIGGERED`
+  fires on *any* change at all, not just a specific condition. The first
+  run only establishes a baseline (no notification). Useful when you don't
+  know in advance what the meaningful change will look like (e.g. "alert
+  me if anything on this product page changes, especially stock").
+  - For `"render": "playwright"`, the snapshot is the inner text of the
+    CSS selectors in `"diff_selectors"` (default `["body"]` — the whole
+    visible page). Scope it tighter (e.g. a specific product-info
+    container) once you know the DOM, to cut noise from things like
+    rotating recommendation carousels.
+  - For `"render": "http"`, the snapshot is the raw HTML response.
+  - The changed lines (from a unified diff, capped at 25 lines) are
+    available to `notify_body` as `{diff}`, alongside `{url}`.
+
 **Use `"playwright"` whenever the target content is JS-rendered or
 personalized by location** — verify this by comparing `curl`'s raw output
 against what a real browser shows before picking a mode. See the Odyssey
@@ -110,6 +132,16 @@ count as "the page" if you just grep the whole body).
   format actually has bookable inventory for the selected date/location.
 - `example_lululemon` — disabled template showing the pattern for a
   simple `"http"`-mode restock/availability watch on a product page.
+- `lululemon_zeroed_in_shirt_0284` — Zeroed In Short Sleeve Shirt, color
+  0284, on Lululemon. Uses `"playwright"` + `"diff"` mode: snapshots the
+  whole visible page body on every run and notifies on any change (price,
+  size/stock availability, etc.), rather than a single boolean condition.
+  Deliberately broad (`diff_selectors: ["body"]`) since the goal is
+  catching any change, not just one predicted condition — this means it
+  may also fire on unrelated page churn (e.g. rotating recommendation
+  carousels). Check the `{diff}` lines in the first few notifications and
+  narrow `diff_selectors` to a specific product-info container if it's
+  too noisy.
 
 ## Caveats
 

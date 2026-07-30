@@ -1,0 +1,12 @@
+{
+  "id": "lululemon_zeroed_in_shirt_0284",
+  "name": "Lululemon Zeroed In Short Sleeve Shirt (color 0284) - any page change",
+  "enabled": true,
+  "render": "playwright",
+  "mode": "diff",
+  "url": "https://shop.lululemon.com/p/men-ss-tops/Zeroed-In-Short-Sleeve-Shirt/_/prod11680098?color=0284",
+  "initial_wait_ms": 6000,
+  "diff_selectors": ["body"],
+  "notify_subject": "Lululemon Zeroed In Short Sleeve Shirt page changed",
+  "notify_body": "The product page changed (could be stock/size availability, price, or something else). Changed lines:\n{diff}\n\nCheck it: {url}"
+}
