@@ -1,7 +1,8 @@
 {
   "id": "lululemon_zeroed_in_shirt_0284",
   "name": "Lululemon Zeroed In Short Sleeve Shirt (color 0284) - any page change",
-  "enabled": true,
+  "enabled": false,
+  "_disabled_reason": "Confirmed BLOCKED, not just untested: shop.lululemon.com resets the connection at the HTTP/2 protocol level (net::ERR_HTTP2_PROTOCOL_ERROR) before serving any content to a real headless-Chromium Playwright browser - reproduced twice from a live GitHub Actions run on this branch (runs 30506940601 and 30506995053) and separately from the dev sandbox, matching the earlier curl HTTP/2 stream-reset symptom. This isn't a headless-detection/CAPTCHA page you can wait or click past - no bytes come back at all, and disabling HTTP/2 to force HTTP/1.1 just hangs instead of erroring. Every run since 5ee0f42 has logged ERROR and never established a baseline snapshot, so as originally written this watcher would silently never fire. Re-enable only after confirming (e.g. a fresh live test run) that Lululemon's edge is letting this traffic through, and re-inspect the real DOM at that point to decide whether diff_selectors should be narrowed from the whole body.",
   "render": "playwright",
   "mode": "diff",
   "url": "https://shop.lululemon.com/p/men-ss-tops/Zeroed-In-Short-Sleeve-Shirt/_/prod11680098?color=0284",
