@@ -16,7 +16,19 @@ Two evaluation backends, chosen per-watcher via the "render" field:
     a specific element (success_selector) rather than raw text. Slower,
     but sees real client-rendered content and is far more precise since it
     can scope the check to a specific element instead of the whole page.
+
+Two evaluation modes, chosen per-watcher via the "mode" field:
+  - (default) "match": the backend above returns true/false, and a watcher
+    is TRIGGERED on the transition from false to true.
+  - "diff": instead of a boolean, the backend captures a text snapshot of
+    the page (for "playwright", the inner text of "diff_selectors" CSS
+    selectors, default ["body"]; for "http", the raw HTML) and compares it
+    to the snapshot from the previous run. A watcher is TRIGGERED whenever
+    the snapshot differs at all (any change, not just a specific
+    condition) - the first run only establishes a baseline and never
+    triggers. The changed lines are available to notify_body as {diff}.
 """
+import difflib
 import json
 import os
 import sys
@@ -27,6 +39,8 @@ from datetime import datetime, timezone
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WATCHERS_DIR = os.path.join(ROOT, "watchers")
 STATE_PATH = os.path.join(ROOT, "state", "state.json")
+
+MAX_SNAPSHOT_CHARS = 50000
 
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -82,6 +96,7 @@ def load_watchers():
         cfg.setdefault("id", os.path.splitext(fname)[0])
         cfg.setdefault("enabled", True)
         cfg.setdefault("render", "http")
+        cfg.setdefault("mode", "match")
         watchers.append(cfg)
     return watchers
 
@@ -118,16 +133,50 @@ def run_actions(page, actions):
             raise ValueError(f"Unknown action: {action}")
 
 
-def evaluate_playwright(page, cfg):
+def render_playwright(page, cfg):
     page.goto(cfg["url"], wait_until="load", timeout=60000)
     page.wait_for_timeout(cfg.get("initial_wait_ms", 5000))
     run_actions(page, cfg.get("actions", []))
+
+
+def evaluate_playwright(page, cfg):
+    render_playwright(page, cfg)
 
     sel = cfg["success_selector"]
     locator = page.locator(sel["selector"])
     if sel.get("has_text"):
         locator = locator.filter(has_text=sel["has_text"])
     return locator.count() > 0
+
+
+def capture_snapshot_playwright(page, cfg):
+    render_playwright(page, cfg)
+    selectors = cfg.get("diff_selectors", ["body"])
+    parts = []
+    for sel in selectors:
+        parts.append("\n".join(page.locator(sel).all_inner_texts()))
+    snapshot = "\n\n".join(parts).strip()
+    return snapshot[:MAX_SNAPSHOT_CHARS]
+
+
+def capture_snapshot_http(cfg):
+    return fetch_http(cfg["url"])[:MAX_SNAPSHOT_CHARS]
+
+
+def summarize_diff(old, new, max_lines=25):
+    diff_lines = list(difflib.unified_diff(
+        old.splitlines(), new.splitlines(), lineterm="", n=0
+    ))
+    changed = [
+        l for l in diff_lines
+        if (l.startswith("+") or l.startswith("-"))
+        and not l.startswith(("+++", "---"))
+    ]
+    if not changed:
+        return "(content changed, but no line-level diff - likely whitespace-only)"
+    if len(changed) > max_lines:
+        changed = changed[:max_lines] + [f"... ({len(changed) - max_lines} more changed lines)"]
+    return "\n".join(changed)
 
 
 def main():
@@ -148,33 +197,65 @@ def main():
     for cfg in watchers:
         wid = cfg["id"]
         prev = state.get(wid, {})
+        mode = cfg.get("mode", "match")
 
         if not cfg.get("enabled", True):
             results.append({"id": wid, "status": "SKIPPED_DISABLED"})
             continue
 
-        try:
-            if cfg["render"] == "playwright":
-                matched = evaluate_playwright(page, cfg)
+        diff_text = None
+        matched = None
+        error = None
+
+        if mode == "diff":
+            try:
+                if cfg["render"] == "playwright":
+                    snapshot = capture_snapshot_playwright(page, cfg)
+                else:
+                    snapshot = capture_snapshot_http(cfg)
+            except Exception as e:
+                snapshot = prev.get("last_snapshot")
+                error = str(e)
+
+            had_baseline = "last_snapshot" in prev
+            if error:
+                status = "ERROR"
+            elif not had_baseline:
+                status = "OK"
+            elif snapshot != prev.get("last_snapshot"):
+                status = "TRIGGERED"
+                diff_text = summarize_diff(prev.get("last_snapshot") or "", snapshot)
             else:
-                matched = evaluate_http(cfg)
-            error = None
-        except Exception as e:
-            matched = prev.get("last_result", False)
-            error = str(e)
+                status = "OK"
 
-        was_true = prev.get("last_result", False)
-        status = "ERROR" if error else ("TRIGGERED" if matched and not was_true else "OK")
+            state[wid] = {
+                "last_snapshot": snapshot,
+                "last_checked": now,
+                "last_error": error,
+                "last_notified": now if status == "TRIGGERED" else prev.get("last_notified"),
+            }
+        else:
+            try:
+                if cfg["render"] == "playwright":
+                    matched = evaluate_playwright(page, cfg)
+                else:
+                    matched = evaluate_http(cfg)
+            except Exception as e:
+                matched = prev.get("last_result", False)
+                error = str(e)
 
-        state[wid] = {
-            "last_result": matched,
-            "last_checked": now,
-            "last_error": error,
-            "last_notified": now if status == "TRIGGERED" else prev.get("last_notified"),
-        }
+            was_true = prev.get("last_result", False)
+            status = "ERROR" if error else ("TRIGGERED" if matched and not was_true else "OK")
+
+            state[wid] = {
+                "last_result": matched,
+                "last_checked": now,
+                "last_error": error,
+                "last_notified": now if status == "TRIGGERED" else prev.get("last_notified"),
+            }
 
         notify_subject = cfg.get("notify_subject") or cfg.get("name", wid)
-        notify_body = (cfg.get("notify_body") or "").format(url=cfg["url"])
+        notify_body = (cfg.get("notify_body") or "").format(url=cfg["url"], diff=diff_text or "")
 
         results.append({
             "id": wid,
@@ -182,6 +263,7 @@ def main():
             "url": cfg["url"],
             "status": status,
             "matched": matched,
+            "diff": diff_text,
             "error": error,
             "notify_subject": notify_subject,
             "notify_body": notify_body,

@@ -32,6 +32,28 @@ Set per-watcher via the `"render"` field:
   then checks for a specific element via `"success_selector"` instead of
   raw text.
 
+## Two evaluation modes
+
+Set per-watcher via the `"mode"` field:
+
+- **`"match"` (default)** — the render backend returns true/false, and the
+  watcher is `TRIGGERED` on the transition from not-matched to matched.
+  This is what both check modes above describe.
+- **`"diff"`** — instead of a boolean, each run captures a text snapshot
+  of the page and compares it to the previous run's snapshot. `TRIGGERED`
+  fires on *any* change at all, not just a specific condition. The first
+  run only establishes a baseline (no notification). Useful when you don't
+  know in advance what the meaningful change will look like (e.g. "alert
+  me if anything on this product page changes, especially stock").
+  - For `"render": "playwright"`, the snapshot is the inner text of the
+    CSS selectors in `"diff_selectors"` (default `["body"]` — the whole
+    visible page). Scope it tighter (e.g. a specific product-info
+    container) once you know the DOM, to cut noise from things like
+    rotating recommendation carousels.
+  - For `"render": "http"`, the snapshot is the raw HTML response.
+  - The changed lines (from a unified diff, capped at 25 lines) are
+    available to `notify_body` as `{diff}`, alongside `{url}`.
+
 **Use `"playwright"` whenever the target content is JS-rendered or
 personalized by location** — verify this by comparing `curl`'s raw output
 against what a real browser shows before picking a mode. See the Odyssey
@@ -110,6 +132,17 @@ count as "the page" if you just grep the whole body).
   format actually has bookable inventory for the selected date/location.
 - `example_lululemon` — disabled template showing the pattern for a
   simple `"http"`-mode restock/availability watch on a product page.
+- `lululemon_zeroed_in_shirt_0284` — Zeroed In Short Sleeve Shirt, color
+  0284, on Lululemon. Uses `"playwright"` + `"diff"` mode: would snapshot
+  the whole visible page body on every run and notify on any change
+  (price, size/stock availability, etc.), rather than a single boolean
+  condition. **Currently `"enabled": false`** — see "Known issues" below.
+  If re-enabled, it's still deliberately broad (`diff_selectors: ["body"]`)
+  since the goal is catching any change, not just one predicted condition;
+  once it's actually reachable, check the `{diff}` lines in the first few
+  notifications and narrow `diff_selectors` to a specific product-info
+  container if it's too noisy (this hasn't been possible to evaluate yet —
+  no real DOM has ever been observed, see below).
 
 ## Caveats
 
@@ -127,3 +160,35 @@ Playwright browser binaries are cached between runs (`actions/cache`,
 keyed on `requirements.txt`) to keep the 10-minute schedule fast; bumping
 the pinned version in `requirements.txt` will trigger one slower run to
 repopulate the cache.
+
+## Known issues
+
+- **`lululemon_zeroed_in_shirt_0284` is disabled — Lululemon blocks this
+  at the network level, not just with a bot-detection page.** Both a
+  plain `curl` and a real headless-Chromium Playwright browser get an
+  immediate `net::ERR_HTTP2_PROTOCOL_ERROR` (HTTP/2 stream reset) before a
+  single byte of the page is served — reproduced consistently across two
+  live GitHub Actions runs on this branch (workflow runs `30506940601` and
+  `30506995053`, both from `ubuntu-latest` hosted runners, i.e. the actual
+  production environment for this repo, not just a dev sandbox) and
+  separately from a local dev sandbox. Forcing HTTP/1.1
+  (`--disable-http2`) doesn't help either — the connection just hangs
+  instead of erroring. This means the block is happening at Akamai's
+  edge (TLS/HTTP2 fingerprinting or IP/ASN reputation) before Chromium
+  gets far enough to render anything, so there's no CAPTCHA to wait out
+  and no UA/header/wait-time tweak that plausibly fixes it — the usual
+  playbook that worked for `odyssey_imax_aug20` (probing selectors,
+  scripted UI actions) doesn't apply because no content ever comes back
+  to probe. The product itself is real (confirmed via web search — Lululemon
+  sells a "Zeroed In Short Sleeve Shirt" men's line, currently
+  $29–$39 marked down from $58 — but the specific `prod11680098?color=0284`
+  URL/variant was never independently confirmed live, since the site
+  couldn't be reached at all). Because of this, `diff_selectors` is left
+  at the original whole-`body` default: no real DOM was ever observed, so
+  there's no evidence-based way to scope it tighter yet. Before
+  re-enabling: trigger the workflow manually (`gh workflow run check.yml`)
+  and confirm a real snapshot gets captured (not another `ERROR`); if it
+  works, use that first successful run's `{diff}` output on the *next*
+  change to judge whether `diff_selectors: ["body"]` is too noisy (product
+  carousels, "recently viewed," promo banners) and narrow it down the same
+  way `odyssey_imax_aug20` was scoped to `.format-filter__list-item`.
