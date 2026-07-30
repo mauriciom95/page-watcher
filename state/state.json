@@ -1,12 +1,12 @@
 {
   "lululemon_zeroed_in_shirt_0284": {
-    "last_checked": "2026-07-30T01:54:32.358847+00:00",
+    "last_checked": "2026-07-30T01:55:54.625024+00:00",
     "last_error": "Page.goto: net::ERR_HTTP2_PROTOCOL_ERROR at https://shop.lululemon.com/p/men-ss-tops/Zeroed-In-Short-Sleeve-Shirt/_/prod11680098?color=0284\nCall log:\n  - navigating to \"https://shop.lululemon.com/p/men-ss-tops/Zeroed-In-Short-Sleeve-Shirt/_/prod11680098?color=0284\", waiting until \"load\"\n",
     "last_notified": null,
     "last_snapshot": null
   },
   "odyssey_imax_aug20": {
-    "last_checked": "2026-07-30T01:54:32.358847+00:00",
+    "last_checked": "2026-07-30T01:55:54.625024+00:00",
     "last_error": "Page.goto: Navigation to \"https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21\" is interrupted by another navigation to \"chrome-error://chromewebdata/\"\nCall log:\n  - navigating to \"https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21\", waiting until \"load\"\n",
     "last_notified": "2026-07-29T16:49:41.530181+00:00",
     "last_result": true
