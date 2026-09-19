@@ -1,7 +1,7 @@
 {
   "id": "odyssey_imax_aug20",
   "name": "The Odyssey (2026) IMAX tickets on sale for showtimes after Aug 20",
-  "enabled": true,
+  "enabled": false,
   "render": "playwright",
   "url": "https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21",
   "initial_wait_ms": 5000,
