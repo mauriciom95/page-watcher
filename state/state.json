@@ -1,7 +1,7 @@
 {
   "odyssey_imax_aug20": {
-    "last_checked": "2026-11-15T03:12:06.613930+00:00",
-    "last_error": "Page.goto: Timeout 60000ms exceeded.\nCall log:\n  - navigating to \"https://www.fandango.com/the-odyssey-2026-241283/movie-overview?date=2026-08-21\", waiting until \"load\"\n",
+    "last_checked": "2026-11-15T10:48:36.525945+00:00",
+    "last_error": null,
     "last_notified": "2026-08-21T15:45:25.640155+00:00",
     "last_result": false
   }
